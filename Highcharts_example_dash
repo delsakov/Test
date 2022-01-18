@@ -1,0 +1,50 @@
+import dash
+import dash_alternative_viz as dav
+from dash import html
+from dash.dependencies import Input, Output
+
+
+external_scripts = [
+    "https://code.highcharts.com/highcharts.js",
+    "http://code.highcharts.com/highcharts-more.js",
+    "http://code.highcharts.com/maps/modules/map.js",
+    "http://code.highcharts.com/maps/modules/data.js",
+    "http://www.highcharts.com/samples/data/maps/world.js",
+    "https://code.highcharts.com/modules/draggable-points.js"
+]
+app = dash.Dash(__name__, external_scripts=external_scripts)
+
+app.layout = html.Div([
+    html.Button(id="my_button", children="Reset"),
+    dav.HighChart(id="my_highchart", constructorType='chart')
+])
+
+
+@app.callback(
+        Output("my_highchart", "options"),
+        [Input("my_button", "n_clicks")],
+        prevent_initial_load=True,
+)
+def random_chart(n_clicks):
+    return {
+        'title': {'text': 'Highcharts draggable demo'},
+        'series': [{
+            'data': [29.9, 71.5, 106.4, 129.2, 144.0, 176.0, 135.6, 148.5,
+                     216.4, 194.1, 95.6, 54.4, 30.9, 41.5, 189, 162.2, 90.0,
+                     45.0, 105.6, 136.5, 389.4, 500.1, 25.6, 69.4],
+            'color': 'white',
+            'marker': {
+                'fillColor': 'blue',
+            },
+            'cursor': 'move',
+            'dragDrop': {
+                'draggableX': False,
+                'draggableY': True
+            }
+        }]
+    }
+
+
+if __name__ == "__main__":
+    app.run_server(port=8052, debug=True)
+    
