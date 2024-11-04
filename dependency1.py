@@ -276,3 +276,6 @@ try:
     print(f"Line {line_number} is in: {context}")
 except FileNotFoundError:
     print("File not found. Please check the file path and try again.")
+
+for i in context:
+    print(dependencies[i])
