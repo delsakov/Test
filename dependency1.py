@@ -9,6 +9,7 @@ import os
 class DependencyVisitor(ast.NodeVisitor):
     def __init__(self):
         self.dependencies = defaultdict(set)
+        self.module_dependencies = defaultdict(set)
         self.current_class = None
         self.current_module = None
         self.imports = {}
@@ -30,6 +31,7 @@ class DependencyVisitor(ast.NodeVisitor):
             full_name = alias.name
             self.imports[alias.asname or alias.name] = full_name
             self.analyze_imported_module(full_name)
+            self.module_dependencies[self.current_module].add(full_name)
 
     def visit_ImportFrom(self, node):
         module = node.module
@@ -38,6 +40,7 @@ class DependencyVisitor(ast.NodeVisitor):
         else:
             for alias in node.names:
                 self.from_imports[module][alias.asname or alias.name] = alias.name
+                self.module_dependencies[self.current_module].add(module)
 
     def visit_ClassDef(self, node):
         class_name = f"{self.current_module}.{node.name}"
@@ -155,7 +158,13 @@ def analyze_project(project_path):
         for func in functions:
             visitor.dependencies[visitor.current_module].add(f"{module}.{func}")
 
-    return visitor.dependencies, project_objects
+    combined_dependencies = defaultdict(set)
+    for module, deps in visitor.dependencies.items():
+        combined_dependencies[module].update(deps)
+    for module, deps in visitor.module_dependencies.items():
+        combined_dependencies[module].update(deps)
+
+    return combined_dependencies, project_objects
 
 
 def create_reversed_dependency(dependencies, project_objects):
