@@ -203,15 +203,15 @@ def analyze_file_structure(file_path, project_path):
             if isinstance(node, ast.ClassDef):
                 current_class = node.name
                 current_function = None
-                line_mapping[node.lineno] = f"{module_name}.{node.name}"
+                line_mapping[node.lineno] = [f"{module_name}.{node.name}"]
                 self.generic_visit(node)
                 current_class = None
             elif isinstance(node, ast.FunctionDef):
                 current_function = node.name
                 if current_class:
-                    line_mapping[node.lineno] = f"{module_name}.{current_class}.{node.name}"
+                    line_mapping[node.lineno] = [f"{module_name}.{current_class}.{node.name}"]
                 else:
-                    line_mapping[node.lineno] = f"{module_name}.{node.name}"
+                    line_mapping[node.lineno] = [f"{module_name}.{node.name}"]
                 self.generic_visit(node)
                 current_function = None
             else:
@@ -223,13 +223,14 @@ def analyze_file_structure(file_path, project_path):
                 for i in range(start, end + 1):
                     if i not in line_mapping:
                         if current_class and current_function:
-                            line_mapping[i] = f"{module_name}.{current_class}.{current_function}"
+                            line_mapping[i] = [f"{module_name}.{current_class}.{current_function}"]
+                            line_mapping[i].append(f"{module_name}.{current_class}")
                         elif current_class:
-                            line_mapping[i] = f"{module_name}.{current_class}"
+                            line_mapping[i] = [f"{module_name}.{current_class}"]
                         elif current_function:
-                            line_mapping[i] = f"{module_name}.{current_function}"
+                            line_mapping[i] = [f"{module_name}.{current_function}"]
                         else:
-                            line_mapping[i] = module_name
+                            line_mapping[i] = [module_name]
 
     with open(file_path, 'r') as file:
         tree = ast.parse(file.read(), filename=file_path)
