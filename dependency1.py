@@ -16,6 +16,7 @@ class DependencyVisitor(ast.NodeVisitor):
         self.star_imports = set()
         self.module_functions = defaultdict(set)
 
+
     def analyze_imported_module(self, module_name):
         try:
             module = importlib.import_module(module_name)
@@ -95,8 +96,44 @@ class DependencyVisitor(ast.NodeVisitor):
         return ""
 
 
+def collect_project_objects(project_path):
+    project_objects = set()
+
+    class ObjectCollector(ast.NodeVisitor):
+        def __init__(self, module_name):
+            self.module_name = module_name
+
+        def visit_ClassDef(self, node):
+            project_objects.add(f"{self.module_name}.{node.name}")
+            self.generic_visit(node)
+
+        def visit_FunctionDef(self, node):
+            project_objects.add(f"{self.module_name}.{node.name}")
+            self.generic_visit(node)
+
+    for root, _, files in os.walk(project_path):
+        for file in files:
+            if file.endswith('.py'):
+                file_path = os.path.join(root, file)
+                relative_path = os.path.relpath(file_path, project_path)
+                module_name = os.path.splitext(relative_path.replace(os.path.sep, '.'))[0]
+                
+                # Add the module to project_objects
+                project_objects.add(module_name)
+                
+                with open(file_path, 'r') as f:
+                    code = f.read()
+                tree = ast.parse(code)
+                
+                collector = ObjectCollector(module_name)
+                collector.visit(tree)
+
+    return project_objects
+
+
 def analyze_project(project_path):
     visitor = DependencyVisitor()
+    project_objects = collect_project_objects(project_path)
     for root, _, files in os.walk(project_path):
         for file in files:
             if file.endswith('.py'):
@@ -118,15 +155,17 @@ def analyze_project(project_path):
         for func in functions:
             visitor.dependencies[visitor.current_module].add(f"{module}.{func}")
 
-    return visitor.dependencies
-    
-    return visitor.dependencies
+    return visitor.dependencies, project_objects
 
-def create_reversed_dependency(dependencies):
+
+def create_reversed_dependency(dependencies, project_objects):
     d = defaultdict(list)
     for k,vals in dependencies.items():
-        for v in vals:
-            d[v].append(k)
+        print("k,vals", k,vals)
+        if k in project_objects:
+            for v in vals:
+                if v in project_objects:
+                    d[v].append(k)
     return d
 
 def create_dependency_graph(dependencies):
@@ -149,8 +188,12 @@ def create_dependency_graph(dependencies):
     
     return G
 
+
 # Usage
-project_path = r"TEST"
-dependencies = create_reversed_dependency(analyze_project(project_path))
+project_path = r"C:\Users\delsa\Documents\My Projects\TEST"
+dependency_graph, project_objects = analyze_project(project_path)
+print("dependency_graph", dependency_graph)
+print("project_objects", project_objects)
+dependencies = create_reversed_dependency(dependency_graph, project_objects)
 G = create_dependency_graph(dependencies)
 print(dependencies)
