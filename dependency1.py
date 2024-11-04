@@ -189,11 +189,80 @@ def create_dependency_graph(dependencies):
     return G
 
 
+def analyze_file_structure(file_path, project_path):
+    line_mapping = {}
+    current_class = None
+    current_function = None
+
+    class Visitor(ast.NodeVisitor):
+        def visit(self, node):
+            nonlocal current_class, current_function
+            relative_path = os.path.relpath(file_path, project_path)
+            module_name = os.path.splitext(relative_path.replace(os.path.sep, '.'))[0]
+
+            if isinstance(node, ast.ClassDef):
+                current_class = node.name
+                current_function = None
+                line_mapping[node.lineno] = f"{module_name}.{node.name}"
+                self.generic_visit(node)
+                current_class = None
+            elif isinstance(node, ast.FunctionDef):
+                current_function = node.name
+                if current_class:
+                    line_mapping[node.lineno] = f"{module_name}.{current_class}.{node.name}"
+                else:
+                    line_mapping[node.lineno] = f"{module_name}.{node.name}"
+                self.generic_visit(node)
+                current_function = None
+            else:
+                self.generic_visit(node)
+            
+            if hasattr(node, 'lineno') and hasattr(node, 'end_lineno'):
+                start = node.lineno
+                end = node.end_lineno if node.end_lineno is not None else node.lineno
+                for i in range(start, end + 1):
+                    if i not in line_mapping:
+                        if current_class and current_function:
+                            line_mapping[i] = f"{module_name}.{current_class}.{current_function}"
+                        elif current_class:
+                            line_mapping[i] = f"{module_name}.{current_class}"
+                        elif current_function:
+                            line_mapping[i] = f"{module_name}.{current_function}"
+                        else:
+                            line_mapping[i] = module_name
+
+    with open(file_path, 'r') as file:
+        tree = ast.parse(file.read(), filename=file_path)
+        Visitor().visit(tree)
+
+    return line_mapping
+
+def get_context_for_line(file_path, project_path, line_number):
+    line_mapping = analyze_file_structure(file_path, project_path)
+    
+    for i in range(line_number, 0, -1):
+        if i in line_mapping:
+            return line_mapping[i]
+    
+    return "Not within any module, class or function"
+
+
 # Usage
-project_path = r"C:\Users\delsa\Documents\My Projects\TEST"
+project_path = r"MyProjects/TEST"
 dependency_graph, project_objects = analyze_project(project_path)
 print("dependency_graph", dependency_graph)
 print("project_objects", project_objects)
 dependencies = create_reversed_dependency(dependency_graph, project_objects)
 G = create_dependency_graph(dependencies)
 print(dependencies)
+
+
+filename = r"functions\func.py"
+file_path = os.path.join(project_directory, filename)
+
+try:
+    line_number = 6
+    context = get_context_for_line(file_path, project_directory, line_number)
+    print(f"Line {line_number} is in: {context}")
+except FileNotFoundError:
+    print("File not found. Please check the file path and try again.")
