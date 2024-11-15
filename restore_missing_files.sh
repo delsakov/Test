@@ -14,8 +14,8 @@ echo "filepath,branch,filesize" > "$CSV_OUTPUT_FILE"
 # Change to the OLD repository
 cd "$OLD_REPO_PATH"
 
-# Fetch all branches from OLD repository
-git fetch --all
+# Fetch all branches and tags from OLD repository
+git fetch --all --tags
 
 # Iterate through each branch in NEW repository
 for BRANCH in "${BRANCHES_TO_UPDATE[@]}"
@@ -65,5 +65,38 @@ do
 
 done
 
+# Restore tags manually from OLD repository to NEW repository
+cd "$OLD_REPO_PATH"
+
+# Iterate over each tag in OLD repository
+for TAG in $(git tag); do
+    # Get the commit hash for the tag in the OLD repository
+    TAG_COMMIT=$(git rev-list -n 1 "$TAG")
+
+    # Change to the NEW repository
+    cd "$NEW_REPO_PATH"
+
+    # Find the best matching commit in the NEW repository for the tag
+    # This could involve matching commit dates, messages, or using other heuristics
+    # For simplicity, we'll try to use commit messages here
+    COMMIT_MESSAGE=$(git log -n 1 --format=%s "$TAG_COMMIT")
+
+    NEW_COMMIT=$(git log --all --grep="$COMMIT_MESSAGE" --format="%H" -n 1)
+
+    if [ -n "$NEW_COMMIT" ]; then
+        # Create the tag in the NEW repository at the best matching commit
+        git tag -a "$TAG" -m "Recreated tag $TAG from OLD repository" "$NEW_COMMIT"
+    else
+        echo "Warning: No matching commit found for tag $TAG"
+    fi
+
+    # Change back to the OLD repository
+    cd "$OLD_REPO_PATH"
+done
+
+# Push tags to NEW repository
+cd "$NEW_REPO_PATH"
+git push origin --tags
+
 # Script complete
-echo "Missing files have been restored and pushed for specified branches."
+echo "Missing files have been restored and pushed for specified branches, and tags have been recreated and pushed."
